@@ -52,15 +52,16 @@ var (
 		Help: "Flags if there are current issues connecting to rclone.",
 	})
 
-	rcloneSizeCmd = exec.Command("rclone", "--config=/config/rclone.conf", "size", "jim:", "--json")
-	delay         = getEnvAsInt("DELAY", 30)
+	rcloneSizeCmd = exec.Command("rclone", "size", os.Getenv("REMOTE"), "--json")
+
+	delay = getEnvAsInt("DELAY", 30)
 )
 
 func main() {
 	recordMetrics()
 
 	http.Handle("/metrics", promhttp.Handler())
-	http.ListenAndServe(":8080", nil)
+	http.ListenAndServe(":"+os.Getenv("PORT"), nil)
 }
 
 //Utilities

@@ -7,4 +7,7 @@
 !.gitignore
 !pom.xml
 !README.md
+!Dockerfile
 !main.go
+!go.mod
+!go.sum
