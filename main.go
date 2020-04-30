@@ -70,7 +70,7 @@ var (
 
 	remote = os.Getenv("REMOTE")
 
-	delay = getEnvAsInt("DELAY", 30)
+	delay = getEnvAsInt("DELAY", 300)
 )
 
 func main() {
