@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -12,6 +14,8 @@ import (
 	"time"
 )
 
+const RemoteLabel = "remote"
+
 type Size struct {
 	Count int `json:"count"`
 	Bytes int `json:"bytes"`
@@ -20,16 +24,25 @@ type Size struct {
 func recordMetrics() {
 	go func() {
 		for {
-			out, err := rcloneSizeCmd.CombinedOutput()
+			var rcloneSizeCmd = exec.Command("rclone", "size", remote, "--json")
+
+			var out bytes.Buffer
+			var stderr bytes.Buffer
+
+			rcloneSizeCmd.Stdout = &out
+			rcloneSizeCmd.Stderr = &stderr
+
+			err := rcloneSizeCmd.Run()
 
 			if err != nil {
-				connectionErrorsGauge.Inc()
+				fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+				connectionErrorsGauge.With(prometheus.Labels{RemoteLabel: remote}).Inc()
 			} else {
 				var response Size
-				json.Unmarshal(out, &response)
-				connectionErrorsGauge.Set(float64(0))
-				countGauge.Set(float64(response.Count))
-				sizeGauge.Set(float64(response.Bytes))
+				json.Unmarshal(out.Bytes(), &response)
+				connectionErrorsGauge.With(prometheus.Labels{RemoteLabel: remote}).Set(float64(0))
+				countGauge.With(prometheus.Labels{RemoteLabel: remote}).Set(float64(response.Count))
+				sizeGauge.With(prometheus.Labels{RemoteLabel: remote}).Set(float64(response.Bytes))
 			}
 			time.Sleep(time.Duration(delay) * time.Second)
 		}
@@ -37,27 +50,31 @@ func recordMetrics() {
 }
 
 var (
-	countGauge = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "rclone_objects_number",
+	countGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "rclone_size_exporter_objects_number",
 		Help: "Number of elements on the remote volume.",
-	})
+	},
+		[]string{RemoteLabel})
 
-	sizeGauge = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "rclone_total_size",
+	sizeGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "rclone_size_exporter_total_size",
 		Help: "Size of the remote volume.",
-	})
+	},
+		[]string{RemoteLabel})
 
-	connectionErrorsGauge = promauto.NewGauge(prometheus.GaugeOpts{
-		Name: "rclone_connection_error",
+	connectionErrorsGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "rclone_size_exporter_connection_error",
 		Help: "Flags if there are current issues connecting to rclone.",
-	})
+	},
+		[]string{RemoteLabel})
 
-	rcloneSizeCmd = exec.Command("rclone", "size", os.Getenv("REMOTE"), "--json")
+	remote = os.Getenv("REMOTE")
 
 	delay = getEnvAsInt("DELAY", 30)
 )
 
 func main() {
+
 	recordMetrics()
 
 	http.Handle("/metrics", promhttp.Handler())
