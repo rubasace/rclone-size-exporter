@@ -13,10 +13,11 @@ RUN go build
 
 FROM rclone/rclone
 
-ENV PORT=8080
-
 WORKDIR /app
 
 COPY --from=build /app/rclone-size-exporter /app/rclone-size-exporter
+
+ENV PORT 8080
+ENV RCLONE_CONFIG /config/rclone/rclone.conf
 
 ENTRYPOINT ["/app/rclone-size-exporter"]
